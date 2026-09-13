@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c1bda36710a97ac4a90e87dee600cc14, type: 3}
+  m_Name: QuestHeal
+  m_EditorClassIdentifier: 
+  questId: quest_heal
+  questName: "\u5BFB\u627E\u6CBB\u7597\u836F\u6C34"
+  description: "\u6751\u5B50\u88AB\u53F2\u83B1\u59C6\u88AD\u51FB\uFF0C\u6751\u957F\u9700\u8981\u6CBB\u7597\u836F\u6C34\u3002"
+  targetCount: 1
+  nextQuestId: quest_deliver_heal
+  targetNPCId: NPC1
+  targetScene: 01_NewbieVillage
