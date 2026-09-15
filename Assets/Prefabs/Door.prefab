@@ -64,7 +64,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+  - {fileID: 2100000, guid: 3e36df56c6fa5f64085c14d9d4f6f8d9, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -146,4 +146,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 45b7facd24c1e124891ae9256b723f04, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  targetScene: 02_Forest
+  sceneInternal: 1
+  targetPointName: ForestBattleSpawn
+  targetScene: 
+  targetSpawnPointName: 

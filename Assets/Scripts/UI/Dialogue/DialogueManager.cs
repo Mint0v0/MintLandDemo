@@ -46,7 +46,6 @@ namespace MintLandDemo.UI.Dialogue
                 Debug.LogWarning("[DialogueManager] 未找到 QuestSystem，接/交任务动作将无法执行。");
             }
 
-            // 缓存 PlayerController，避免每次对话都 FindObjectOfType
             _playerController = FindObjectOfType<PlayerController>();
             if (_playerController == null)
             {
@@ -73,13 +72,11 @@ namespace MintLandDemo.UI.Dialogue
             _currentIndex = 0;
             IsDialogueActive = true;
 
-            // 对话开始：加锁 + 禁用 Gameplay 输入
             if (_playerController != null)
             {
                 _playerController.AddLock(PlayerLockReason.Talking);
             }
 
-            // 对话开始时，如果正在自动寻路，先取消导航
             var nav = MintLandDemo.Gameplay.Navigation.NavigationSystem.Instance;
             if (nav != null && nav.IsNavigating)
                 nav.CancelNavigation();
@@ -91,42 +88,100 @@ namespace MintLandDemo.UI.Dialogue
         private void ShowNextNode()
         {
             if (!IsDialogueActive) return;
-
-            _currentIndex++;
-            if (_currentIndex >= _nodes.Count)
-            {
-                EndDialogue();
-            }
-            else
-            {
-                ShowNode(_currentIndex);
-            }
+            ShowNode(_currentIndex + 1);
         }
 
+        /// <summary>
+        /// 显示第 index 个节点。
+        /// - 有台词 → 显示台词，等玩家点下一步
+        /// - 无台词但有动作（获得/扣除物品）→ 自动生成提示文本"获得: 宝剑 × 1"
+        /// - 无台词、无选项、无可显示的动作 → 直接执行动作并跳到下一节点
+        /// </summary>
         private void ShowNode(int index)
         {
-            DialogueNode node = _nodes[index];
-            if (speakerText != null) speakerText.text = node.speakerName;
-            if (dialogueText != null) dialogueText.text = node.dialogueText;
-
-            bool hasChoices = node.choices != null && node.choices.Count > 0;
-
-            if (nextButton != null) nextButton.gameObject.SetActive(!hasChoices);
-
-            if (hasChoices)
+            // 跳过所有"无内容可显示"的节点
+            while (index < _nodes.Count)
             {
-                if (ChoiceManager.Instance != null)
+                DialogueNode node = _nodes[index];
+                _currentIndex = index;
+
+                string displayText = BuildDisplayText(node);
+                bool hasText = !string.IsNullOrEmpty(displayText);
+                bool hasChoices = node.choices != null && node.choices.Count > 0;
+
+                // 无文本、无选项 → 直接执行动作，继续下一个节点
+                if (!hasText && !hasChoices)
                 {
-                    ChoiceManager.Instance.ShowChoices();
+                    ExecuteAction(node);
+                    index++;
+                    continue;
+                }
+
+                // 有内容 → 显示
+                if (speakerText != null) speakerText.text = node.speakerName;
+                if (dialogueText != null) dialogueText.text = displayText;
+                if (nextButton != null) nextButton.gameObject.SetActive(!hasChoices);
+
+                if (hasChoices)
+                {
+                    if (ChoiceManager.Instance != null)
+                        ChoiceManager.Instance.ShowChoices();
+                    else
+                        Debug.LogError("[DialogueManager] ChoiceManager 引用为空！请检查场景中是否有 ChoiceManager 组件。");
                 }
                 else
                 {
-                    Debug.LogError("[DialogueManager] ChoiceManager 引用为空！请检查场景中是否有 ChoiceManager 组件。");
+                    ExecuteAction(node);
                 }
+                return;
             }
-            else
+
+            // 所有节点都跳过了 → 结束对话
+            EndDialogue();
+        }
+
+        /// <summary>
+        /// 决定当前节点显示什么文本：
+        /// 1. 有 dialogueText → 直接用
+        /// 2. 没 dialogueText 但是 GiveItem → "获得: 宝剑 × 1"
+        /// 3. 没 dialogueText 但是 RemoveItem → "交付: 治疗药水 × 1"
+        /// 4. 其他 → null（会触发跳过）
+        /// </summary>
+        private string BuildDisplayText(DialogueNode node)
+        {
+            if (!string.IsNullOrEmpty(node.dialogueText))
+                return node.dialogueText;
+
+            string itemName = GetDisplayName(node.itemId);
+
+            switch (node.action)
             {
-                ExecuteAction(node);
+                case DialogueAction.GiveItem:
+                    if (string.IsNullOrEmpty(node.itemId)) return null;
+                    return $"获得: {itemName} × {node.itemCount}";
+
+                case DialogueAction.RemoveItem:
+                    if (string.IsNullOrEmpty(node.itemId)) return null;
+                    return $"交付: {itemName} × {node.itemCount}";
+
+                default:
+                    return null;
+            }
+        }
+
+        private string GetDisplayName(string itemId)
+        {
+            if (string.IsNullOrEmpty(itemId)) return "物品";
+            switch (itemId.ToLowerInvariant())
+            {
+                case "sword": return "宝剑";
+                case "axe": return "斧头";
+                case "potion": return "治疗药水";
+                case "slime_mucus": return "史莱姆粘液";
+                case "ruby": return "红宝石";
+                case "sapphire": return "蓝宝石";
+                case "emerald": return "绿宝石";
+                default: return itemId;
             }
         }
 
@@ -261,7 +316,6 @@ namespace MintLandDemo.UI.Dialogue
             if (dialoguePanel != null) dialoguePanel.SetActive(false);
             if (ChoiceManager.Instance != null) ChoiceManager.Instance.HideChoices();
 
-            // 兜底：缓存引用可能因跨场景失效，重新查找
             if (_playerController == null)
                 _playerController = FindObjectOfType<PlayerController>();
 

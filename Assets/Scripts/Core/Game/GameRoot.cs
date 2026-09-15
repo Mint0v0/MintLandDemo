@@ -1,6 +1,7 @@
 using UnityEngine;
 using MintLandDemo.Core.Event;
 using MintLandDemo.Gameplay.Character;
+using MintLandDemo.Gameplay.Equipment;
 using MintLandDemo.Infrastructure.Save;
 using MintLandDemo.Infrastructure.Scene;
 
@@ -17,6 +18,10 @@ namespace MintLandDemo.Core.Game
         public static GameRoot Instance { get; private set; }
 
         private const string DefaultScene = "01_NewbieVillage";
+
+        [Header("初始装备（仅新游戏时应用，不影响存档）")]
+        [Tooltip("首次进入游戏时自动装备到武器槽 0")]
+        [SerializeField] private EquipmentConfig startingWeapon;
 
         private GameContext _context;
         public GameContext Context => _context;
@@ -65,6 +70,7 @@ namespace MintLandDemo.Core.Game
             else
             {
                 data = _context.Data;
+                ApplyNewGameDefaults(data);   // ← 新游戏时应用初始装备
             }
 
             // 2. 读档后必须重算最终属性（finalXxx 不持久化，需从装备/宝石重新计算）。
@@ -80,6 +86,31 @@ namespace MintLandDemo.Core.Game
             {
                 Debug.LogWarning("[GameRoot] 未找到 SceneService，跳过场景加载。");
             }
+        }
+
+        /// <summary>
+        /// 首次进入游戏时（无存档）应用初始装备。
+        /// 有存档时不会执行。
+        /// </summary>
+        private void ApplyNewGameDefaults(GameRuntimeData data)
+        {
+            if (data == null) return;
+            if (startingWeapon == null) return;
+
+            if (data.Equipment == null) data.Equipment = new EquipmentRuntime();
+            if (data.Equipment.weaponSlots == null || data.Equipment.weaponSlots.Count == 0)
+            {
+                data.Equipment.weaponSlots = new System.Collections.Generic.List<WeaponSlotData>
+                {
+                    new WeaponSlotData(),
+                    new WeaponSlotData()
+                };
+            }
+
+            data.Equipment.weaponSlots[0].config = startingWeapon;
+            data.Equipment.activeWeaponIndex = 0;
+
+            Debug.Log($"[GameRoot] 新游戏初始装备: {startingWeapon.name}");
         }
 
         private static void OnDemoCompleted(DemoCompletedEvent evt)

@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: BossConfig
   m_EditorClassIdentifier: 
   enemyName: Boss
-  maxHp: 200
+  maxHp: 100
   attack: 20
-  defense: 10
+  defense: 5
   expReward: 50

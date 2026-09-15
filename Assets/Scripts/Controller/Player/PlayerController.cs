@@ -195,6 +195,10 @@ namespace MintLandDemo.Controller.Player
                 FindObjectOfType<EquipmentSystem>()?.SwitchActiveWeapon(1);
         }
 
+        /// <summary>
+        /// 移动处理。关键：无论玩家是否按 WASD，都调用 CharacterController.Move 应用重力，
+        /// 这样传送到空中后角色会立即受重力下落。
+        /// </summary>
         private void HandleMovement()
         {
             if (IsNavigating)
@@ -214,11 +218,12 @@ namespace MintLandDemo.Controller.Player
             right.Normalize();
 
             Vector3 moveDirection = (forward * _moveInput.y + right * _moveInput.x).normalized;
-            if (moveDirection.magnitude < 0.01f)
-                return;
 
-            float speed = MoveSpeed;
-            Vector3 velocity = moveDirection * speed;
+            // 水平速度：无输入时 moveDirection 为零向量 → 水平位移为 0
+            Vector3 horizontalVelocity = moveDirection * MoveSpeed;
+
+            // 垂直速度：始终应用重力
+            Vector3 velocity = horizontalVelocity;
             velocity.y = _verticalVelocity;
 
             _characterController.Move(velocity * Time.deltaTime);
@@ -278,6 +283,13 @@ namespace MintLandDemo.Controller.Player
                     transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, RotationSpeed * Time.deltaTime);
                 }
             }
+        }
+
+        public void TeleportTo(Vector3 position)
+        {
+            if (_characterController != null) _characterController.enabled = false;
+            transform.position = position;
+            if (_characterController != null) _characterController.enabled = true;
         }
     }
 }

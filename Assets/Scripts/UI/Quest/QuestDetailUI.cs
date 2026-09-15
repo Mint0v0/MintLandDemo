@@ -124,7 +124,7 @@ namespace MintLandDemo.UI.Quest
                 if (label != null)
                 {
                     label.text = $"{quest.questName} - 已完成";
-                    label.color = Color.black;
+                    label.color = Color.white;
                 }
 
                 btn.interactable = false;

@@ -21,8 +21,10 @@ namespace MintLandDemo.Controller.Player
         [Header("Attack Displacement")]
         [Tooltip("攻击时是否让玩家位置跟随动画的 Hips 位移")]
         [SerializeField] private bool applyAttackDisplacement = true;
-        [Tooltip("补偿速度上限（米/秒），避免瞬移")]
-        [SerializeField] private float maxDisplacementSpeed = 5f;
+        [Tooltip("单帧最大补偿位移（米/秒），防止瞬移。建议 50 以上")]
+        [SerializeField] private float maxDisplacementSpeed = 50f;
+        [Tooltip("攻击结束后继续锁定 Hips 世界坐标的时长，应略大于 Attack->Idle 的 Transition Duration")]
+        [SerializeField] private float attackExitTrackingDuration = 0.4f;
 
         private Animator _animator;
         private CharacterController _characterController;
@@ -39,11 +41,12 @@ namespace MintLandDemo.Controller.Player
         private float _lastAttackTime = -999f;
         private bool _isInAttackState = false;
 
-        // 攻击位移追踪
         private Vector3 _attackStartHipsWorld;
         private Vector3 _maxHipsWorld;
+        private Vector3 _lockedHipsWorld;
         private bool _hasAttackTracking = false;
         private bool _wasInAttackState = false;
+        private float _attackExitTrackingTimer = 0f;
 
         private void Awake()
         {
@@ -80,7 +83,6 @@ namespace MintLandDemo.Controller.Player
                             || state.IsName(attack1StateName)
                             || state.IsName(attack2StateName);
 
-            // 攻击锁
             if (_playerController != null)
             {
                 if (_isInAttackState)
@@ -89,7 +91,6 @@ namespace MintLandDemo.Controller.Player
                     _playerController.RemoveLock(PlayerLockReason.Attacking);
             }
 
-            // Speed：攻击期间强制为 0
             float speed = 0f;
             if (!_isInAttackState)
             {
@@ -98,14 +99,6 @@ namespace MintLandDemo.Controller.Player
             _animator.SetFloat(_speedHash, speed);
         }
 
-        /// <summary>
-        /// 攻击期间：把 Hips 的世界位移应用到 CharacterController。
-        /// 原理：
-        ///   1. 攻击开始时记录 Hips 世界坐标作为起点。
-        ///   2. 追踪整个攻击过程中 Hips 世界坐标的"最大偏移点"。
-        ///   3. 一旦 Hips 开始回归（偏移量减小），每帧把 Player 往最大偏移点推。
-        /// 效果：Hips 视觉上前冲 → 玩家跟着前移；Hips 回归 → 玩家保持在最远点。
-        /// </summary>
         private void LateUpdate()
         {
             if (!applyAttackDisplacement) return;
@@ -113,51 +106,86 @@ namespace MintLandDemo.Controller.Player
 
             bool isAttacking = _isInAttackState;
 
-            // 攻击开始那一帧：记录起始 Hips 世界坐标
             if (isAttacking && !_wasInAttackState)
             {
                 _attackStartHipsWorld = _bodyBone.position;
                 _maxHipsWorld = _attackStartHipsWorld;
                 _hasAttackTracking = true;
+                _attackExitTrackingTimer = 0f;
             }
 
             if (isAttacking && _hasAttackTracking)
             {
-                Vector3 currentHips = _bodyBone.position;
-                Vector3 offsetFromStart = currentHips - _attackStartHipsWorld;
-                offsetFromStart.y = 0f;
-
-                float currentOffset = offsetFromStart.magnitude;
-                float maxOffset = (_maxHipsWorld - _attackStartHipsWorld).magnitude;
-
-                if (currentOffset > maxOffset)
-                {
-                    // 还在前冲：更新最大偏移点，Player 不动
-                    _maxHipsWorld = currentHips;
-                }
-                else if (currentOffset < maxOffset - 0.005f)
-                {
-                    // 回归阶段：Player 补偿，让 Hips 保持在前冲最远点
-                    Vector3 diff = _maxHipsWorld - currentHips;
-                    diff.y = 0f;
-
-                    if (diff.sqrMagnitude > 0.0001f)
-                    {
-                        float maxStep = maxDisplacementSpeed * Time.deltaTime;
-                        if (diff.magnitude > maxStep)
-                            diff = diff.normalized * maxStep;
-
-                        _characterController.Move(diff);
-                    }
-                }
+                TrackDuringAttack();
             }
 
-            if (!isAttacking && _wasInAttackState)
+            if (!isAttacking && _wasInAttackState && _hasAttackTracking)
             {
-                _hasAttackTracking = false;
+                _lockedHipsWorld = _maxHipsWorld;
+                _attackExitTrackingTimer = attackExitTrackingDuration;
+            }
+
+            if (!isAttacking && _attackExitTrackingTimer > 0f && _hasAttackTracking)
+            {
+                _attackExitTrackingTimer -= Time.deltaTime;
+
+                CompensateTo(_lockedHipsWorld);
+
+                if (_attackExitTrackingTimer <= 0f)
+                    _hasAttackTracking = false;
             }
 
             _wasInAttackState = isAttacking;
+        }
+
+        /// <summary>
+        /// 攻击期间：只追踪"Hips 相对起点沿角色 forward 方向的最大位移"。
+        /// 前摇阶段的"向后移动"会被忽略，避免玩家被推后。
+        /// </summary>
+        private void TrackDuringAttack()
+        {
+            Vector3 currentHips = _bodyBone.position;
+            Vector3 offset = currentHips - _attackStartHipsWorld;
+            offset.y = 0f;
+
+            Vector3 forward = transform.forward;
+            forward.y = 0f;
+            forward.Normalize();
+
+            float forwardOffset = Vector3.Dot(offset, forward);
+            float maxForwardOffset = Vector3.Dot(_maxHipsWorld - _attackStartHipsWorld, forward);
+
+            if (forwardOffset > maxForwardOffset && forwardOffset > 0f)
+            {
+                _maxHipsWorld = currentHips;
+            }
+            else if (forwardOffset < maxForwardOffset - 0.001f && maxForwardOffset > 0f)
+            {
+                CompensateTo(_maxHipsWorld);
+            }
+        }
+
+        /// <summary>
+        /// 只沿角色 forward 方向补偿，忽略侧向和后向的偏差。
+        /// </summary>
+        private void CompensateTo(Vector3 targetHipsWorld)
+        {
+            Vector3 currentHips = _bodyBone.position;
+
+            Vector3 forward = transform.forward;
+            forward.y = 0f;
+            forward.Normalize();
+
+            float forwardDiff = Vector3.Dot(targetHipsWorld - currentHips, forward);
+            if (Mathf.Abs(forwardDiff) < 0.0001f) return;
+
+            Vector3 moveVec = forward * forwardDiff;
+
+            float maxStep = maxDisplacementSpeed * Time.deltaTime;
+            if (moveVec.magnitude > maxStep)
+                moveVec = moveVec.normalized * maxStep;
+
+            _characterController.Move(moveVec);
         }
 
         private float GetCurrentMoveSpeed()

@@ -66,7 +66,7 @@ namespace MintLandDemo.Core.Game
     [System.Serializable]
     public class InventoryRuntime
     {
-        public int gold = 0;
+        public int gold = 500;
         public List<ItemEntry> items = new List<ItemEntry>();
     }
 
