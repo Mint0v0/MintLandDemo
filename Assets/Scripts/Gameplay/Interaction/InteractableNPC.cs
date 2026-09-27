@@ -50,6 +50,9 @@ namespace MintLandDemo.Gameplay.Interaction
         [Header("条件对话（按任务状态分流，自上而下优先匹配）")]
         public List<ConditionalDialogue> conditionalDialogues;
 
+        [Header("图模式对话（可选，非空时优先使用）")]
+        public DialogueGraph dialogueGraph;
+
         [Header("交互提示 UI")]
         [SerializeField] private GameObject interactionPrompt;
 
@@ -100,13 +103,19 @@ namespace MintLandDemo.Gameplay.Interaction
 
         private void StartDialogue()
         {
+            // 图模式优先
+            if (dialogueGraph != null && !string.IsNullOrEmpty(dialogueGraph.entryNodeId))
+            {
+                if (DialogueManager.Instance != null)
+                    DialogueManager.Instance.StartDialogue(dialogueGraph);
+                return;
+            }
+
+            // 旧模式兜底
             List<DialogueNode> nodes = ResolveDialogue();
             if (nodes == null || nodes.Count == 0) return;
-
             if (DialogueManager.Instance != null)
-            {
                 DialogueManager.Instance.StartDialogue(nodes);
-            }
         }
 
         private List<DialogueNode> ResolveDialogue()

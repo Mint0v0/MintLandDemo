@@ -29,6 +29,8 @@ namespace MintLandDemo.Gameplay.Interaction
         public string questId;                 // action 涉及任务时使用
         public string itemId;                  // action = GiveItem 时使用
         public int itemCount = 1;
+        public string nextNodeId;                      // 选择后跳转的节点 ID（空 = 沿用默认顺序）
+        public List<DialogueConditionData> conditions; // 该选项可见的条件（空 = 无条件显示）
     }
 
     /// <summary>
@@ -44,6 +46,11 @@ namespace MintLandDemo.Gameplay.Interaction
         public string questId;     // action 涉及任务时使用（AcceptQuest / CompleteQuest）
         public string itemId;      // action = GiveItem 时使用
         public int itemCount = 1;  // action = GiveItem 时使用
-        public List<DialogueChoice> choices;    // 非空 = 选择节点
+        [HideInInspector] public List<DialogueChoice> choices;    // 已废弃：跳转统一由 DialogueEdge 表达（保留字段以兼容旧资产序列化）
+
+        // ---- 图结构字段（仅由 DialogueGraph 使用；线性播放时忽略）----
+        public string nodeId;           // 节点唯一 ID（图中引用）
+        public string nextNodeId;       // 顺序推进时的下一节点 ID（空 = 由 choices/edges 决定）
+        public Vector2 editorPosition;  // 图编辑器中的节点位置（运行时忽略）
     }
 }

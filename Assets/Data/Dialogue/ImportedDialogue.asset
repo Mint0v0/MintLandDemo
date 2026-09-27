@@ -1,0 +1,148 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 48b9e76c1c6aa104ea7498b55582fe44, type: 3}
+  m_Name: ImportedDialogue
+  m_EditorClassIdentifier: 
+  graphId: 
+  entryNodeId: n_greet
+  nodes:
+  - speakerName: "\u73E0\u5B9D\u5546"
+    dialogueText: "\u4F60\u597D\uFF0C\u65C5\u884C\u8005\u3002"
+    action: 0
+    questId: 
+    itemId: 
+    itemCount: 0
+    choices: []
+    nodeId: n_greet
+    nextNodeId: 
+    editorPosition: {x: 100, y: -100}
+  - speakerName: "\u73E0\u5B9D\u5546"
+    dialogueText: "\u6211\u662F\u6D41\u6D6A\u7684\u73E0\u5B9D\u5546\u3002"
+    action: 0
+    questId: 
+    itemId: 
+    itemCount: 0
+    choices: []
+    nodeId: n_who
+    nextNodeId: 
+    editorPosition: {x: 300, y: -100}
+  - speakerName: "\u73E0\u5B9D\u5546"
+    dialogueText: "\u613F\u610F\u542C\u6211\u8BB2\u4E2A\u6545\u4E8B\u5417\uFF1F"
+    action: 0
+    questId: 
+    itemId: 
+    itemCount: 0
+    choices: []
+    nodeId: n_offer
+    nextNodeId: 
+    editorPosition: {x: 500, y: -100}
+  - speakerName: "\u73E0\u5B9D\u5546"
+    dialogueText: "\u5F88\u4E45\u4EE5\u524D\uFF0C\u6211\u5728\u77FF\u6D1E\u91CC\u6316\u5230\u4E86\u7EA2\u5B9D\u77F3\u3002"
+    action: 0
+    questId: 
+    itemId: 
+    itemCount: 0
+    choices: []
+    nodeId: n_story1
+    nextNodeId: 
+    editorPosition: {x: 700, y: -50.4}
+  - speakerName: "\u73E0\u5B9D\u5546"
+    dialogueText: "\u584C\u65B9\u65F6\u8FD9\u9897\u5B9D\u77F3\u6551\u4E86\u6211\u4E00\u547D\u3002"
+    action: 0
+    questId: 
+    itemId: 
+    itemCount: 0
+    choices: []
+    nodeId: n_story2
+    nextNodeId: 
+    editorPosition: {x: 900, y: -50.4}
+  - speakerName: "\u73E0\u5B9D\u5546"
+    dialogueText: "\u8FD9\u4E2A\u9001\u7ED9\u4F60\uFF0C\u7B97\u662F\u7F18\u5206\u3002"
+    action: 3
+    questId: 
+    itemId: ruby
+    itemCount: 2
+    choices: []
+    nodeId: n_gift
+    nextNodeId: 
+    editorPosition: {x: 1101.6, y: -50.4}
+  - speakerName: "\u73E0\u5B9D\u5546"
+    dialogueText: "\u4E0B\u6B21\u518D\u4F1A\u3002"
+    action: 0
+    questId: 
+    itemId: 
+    itemCount: 0
+    choices: []
+    nodeId: n_bye
+    nextNodeId: 
+    editorPosition: {x: 700, y: -250.4}
+  edges:
+  - edgeId: e_greet_who
+    fromNodeId: n_greet
+    toNodeId: n_who
+    choiceText: 
+    action: 0
+    questId: 
+    itemId: 
+    itemCount: 0
+    sortOrder: 0
+    conditions: []
+  - edgeId: e_who_offer
+    fromNodeId: n_who
+    toNodeId: n_offer
+    choiceText: 
+    action: 0
+    questId: 
+    itemId: 
+    itemCount: 0
+    sortOrder: 0
+    conditions: []
+  - edgeId: e_offer_story
+    fromNodeId: n_offer
+    toNodeId: n_story1
+    choiceText: "\u6211\u613F\u610F\u542C"
+    action: 0
+    questId: 
+    itemId: 
+    itemCount: 0
+    sortOrder: 0
+    conditions: []
+  - edgeId: e_offer_bye
+    fromNodeId: n_offer
+    toNodeId: n_bye
+    choiceText: "\u4E0B\u6B21\u518D\u8BF4"
+    action: 0
+    questId: 
+    itemId: 
+    itemCount: 0
+    sortOrder: 1
+    conditions: []
+  - edgeId: e_story1_story2
+    fromNodeId: n_story1
+    toNodeId: n_story2
+    choiceText: 
+    action: 0
+    questId: 
+    itemId: 
+    itemCount: 0
+    sortOrder: 0
+    conditions: []
+  - edgeId: e_story2_gift
+    fromNodeId: n_story2
+    toNodeId: n_gift
+    choiceText: 
+    action: 0
+    questId: 
+    itemId: 
+    itemCount: 0
+    sortOrder: 0
+    conditions: []

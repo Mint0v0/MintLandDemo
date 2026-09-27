@@ -1,12 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
-using MintLandDemo.Core.Event;
-using MintLandDemo.Core.Game;
 using MintLandDemo.Gameplay.Interaction;
-using MintLandDemo.Gameplay.Quest;
-using MintLandDemo.Gameplay.Inventory;
-using MintLandDemo.UI.Shop;
 using MintLandDemo.Controller.Player;
 
 namespace MintLandDemo.UI.Dialogue
@@ -23,8 +18,12 @@ namespace MintLandDemo.UI.Dialogue
 
         private List<DialogueNode> _nodes;
         private int _currentIndex;
-        private QuestSystem _questSystem;
         private PlayerController _playerController;
+
+        // 图模式状态（_graph 非空 = 图模式）
+        private DialogueGraph _graph;
+        private DialogueNode _currentGraphNode;
+        private DialogueEdge _pendingEdge;
 
         public bool IsDialogueActive { get; private set; }
 
@@ -40,12 +39,6 @@ namespace MintLandDemo.UI.Dialogue
 
         private void Start()
         {
-            _questSystem = FindObjectOfType<QuestSystem>();
-            if (_questSystem == null)
-            {
-                Debug.LogWarning("[DialogueManager] 未找到 QuestSystem，接/交任务动作将无法执行。");
-            }
-
             _playerController = FindObjectOfType<PlayerController>();
             if (_playerController == null)
             {
@@ -85,9 +78,131 @@ namespace MintLandDemo.UI.Dialogue
             ShowNode(_currentIndex);
         }
 
+        /// <summary>
+        /// 图模式入口：按节点 ID 跳转，而不是按 index 线性播放。
+        /// 旧 StartDialogue(List&lt;DialogueNode&gt;) 保持不变，走线性路径。
+        /// </summary>
+        public void StartDialogue(DialogueGraph graph)
+        {
+            if (graph == null || string.IsNullOrEmpty(graph.entryNodeId)) return;
+            if (IsDialogueActive) return;
+
+            _graph = graph;
+            _currentGraphNode = null;
+            IsDialogueActive = true;
+
+            Debug.Log($"[DialogueManager] 图模式启动对话: graphId={graph.graphId}, entryNodeId={graph.entryNodeId}");
+
+            if (_playerController != null)
+            {
+                _playerController.AddLock(PlayerLockReason.Talking);
+            }
+
+            // 与旧 StartDialogue 一致：取消导航
+            var nav = MintLandDemo.Gameplay.Navigation.NavigationSystem.Instance;
+            if (nav != null && nav.IsNavigating)
+                nav.CancelNavigation();
+
+            if (dialoguePanel != null) dialoguePanel.SetActive(true);
+
+            GoToGraphNode(graph.entryNodeId);
+        }
+
+        /// <summary>
+        /// 图模式：跳转到指定节点并播放。节点自身 action 立即执行，出边决定下一步。
+        /// </summary>
+        private void GoToGraphNode(string nodeId)
+        {
+            if (_graph == null) { EndDialogue(); return; }
+
+            DialogueNode node = _graph.nodes.Find(n => n != null && n.nodeId == nodeId);
+            if (node == null) { EndDialogue(); return; }
+
+            _currentGraphNode = node;
+            Debug.Log($"[DialogueManager] 图模式节点: {node.nodeId} (speaker={node.speakerName})");
+
+            // 1. 执行节点自身的 action
+            DialogueInstructionExecutor.Execute(node.action, node.questId, node.itemId, node.itemCount);
+
+            // 2. 计算文本（复用现有 BuildDisplayText 逻辑）
+            string displayText = BuildDisplayText(node);
+
+            // 3. 找出边，并过滤：条件通过 + 目标节点非空
+            List<DialogueEdge> outEdges = _graph.edges.FindAll(e => e != null && e.fromNodeId == nodeId);
+            outEdges = outEdges.FindAll(e =>
+                !string.IsNullOrEmpty(e.toNodeId) &&
+                DialogueConditionEvaluator.EvaluateAll(e.conditions));
+
+            // 4. 分支处理
+            if (outEdges.Count == 0)
+            {
+                // 无边 → 显示当前文本（如有），点下一步结束对话
+                if (speakerText != null) speakerText.text = node.speakerName;
+                if (dialogueText != null) dialogueText.text = displayText;
+                if (nextButton != null) nextButton.gameObject.SetActive(true);
+                return;
+            }
+
+            if (outEdges.Count == 1 && string.IsNullOrEmpty(outEdges[0].choiceText))
+            {
+                // 单条无边文字 → 显示文本 + 下一步，点击后跳到下个节点
+                if (speakerText != null) speakerText.text = node.speakerName;
+                if (dialogueText != null) dialogueText.text = displayText;
+                if (nextButton != null) nextButton.gameObject.SetActive(true);
+                _pendingEdge = outEdges[0];
+                return;
+            }
+
+            // 多条 或 有 choiceText → 显示动态选项按钮
+            if (speakerText != null) speakerText.text = node.speakerName;
+            if (dialogueText != null) dialogueText.text = displayText;
+            if (nextButton != null) nextButton.gameObject.SetActive(false);
+
+            if (ChoiceManager.Instance != null)
+            {
+                ChoiceManager.Instance.ShowDynamicChoices(outEdges, OnEdgeSelected);
+            }
+        }
+
+        /// <summary>图模式：玩家点击某个动态选项后，执行该边 action 并跳转。</summary>
+        private void OnEdgeSelected(DialogueEdge edge)
+        {
+            if (edge == null) { EndDialogue(); return; }
+
+            // 执行边自身的 action
+            DialogueInstructionExecutor.Execute(edge.action, edge.questId, edge.itemId, edge.itemCount);
+
+            // 跳转
+            if (string.IsNullOrEmpty(edge.toNodeId))
+            {
+                // 边没连线 → 结束对话
+                EndDialogue();
+                return;
+            }
+            GoToGraphNode(edge.toNodeId);
+        }
+
         private void ShowNextNode()
         {
             if (!IsDialogueActive) return;
+
+            // 图模式：沿 pending 边跳转；无边则结束
+            if (_graph != null)
+            {
+                if (_pendingEdge != null)
+                {
+                    string next = _pendingEdge.toNodeId;
+                    _pendingEdge = null;
+                    GoToGraphNode(next);
+                }
+                else
+                {
+                    EndDialogue();
+                }
+                return;
+            }
+
+            // 旧线性模式
             ShowNode(_currentIndex + 1);
         }
 
@@ -192,104 +307,7 @@ namespace MintLandDemo.UI.Dialogue
 
         private void Execute(DialogueAction action, string questId, string itemId, int itemCount)
         {
-            if (action != DialogueAction.None)
-            {
-                Debug.Log($"[DialogueManager] 执行动作: {action}, QuestId: {questId}");
-            }
-
-            switch (action)
-            {
-                case DialogueAction.AcceptQuest:
-                    if (_questSystem == null)
-                    {
-                        Debug.LogError("[DialogueManager] QuestSystem 引用为空！请检查场景中是否有 QuestSystem 组件。");
-                        return;
-                    }
-                    _questSystem.AcceptQuest(questId);
-                    break;
-
-                case DialogueAction.CompleteQuest:
-                    if (_questSystem != null) _questSystem.CompleteQuest(questId);
-                    break;
-
-                case DialogueAction.GiveItem:
-                    GiveItem(itemId, itemCount);
-                    break;
-
-                case DialogueAction.RemoveItem:
-                    RemoveItem(itemId, itemCount);
-                    break;
-
-                case DialogueAction.OpenShopBuy:
-                    OpenShop(ShopMode.Buy);
-                    break;
-
-                case DialogueAction.OpenShopSell:
-                    OpenShop(ShopMode.Sell);
-                    break;
-
-                case DialogueAction.EndTrade:
-                    if (ChoiceManager.Instance != null)
-                    {
-                        ChoiceManager.Instance.OnEndTrade();
-                    }
-                    break;
-
-                default:
-                    break;
-            }
-        }
-
-        private void OpenShop(ShopMode mode)
-        {
-            if (ShopUI.Instance == null)
-            {
-                Debug.LogError("[DialogueManager] ShopUI 引用为空！请检查场景中是否有 ShopUI 组件。");
-                return;
-            }
-            ShopUI.Instance.OpenWithMode(mode);
-        }
-
-        private void GiveItem(string itemId, int count)
-        {
-            if (string.IsNullOrEmpty(itemId)) return;
-
-            GameRuntimeData data = GameRoot.Instance?.Context?.Data;
-            if (data == null || data.Inventory == null) return;
-
-            ItemEntry entry = data.Inventory.items.Find(i => i != null && i.itemId == itemId);
-            if (entry == null)
-            {
-                entry = new ItemEntry { itemId = itemId, count = 0 };
-                data.Inventory.items.Add(entry);
-            }
-            entry.count += count;
-
-            EventBus.Publish(new ItemAddedEvent { ItemId = itemId, Count = count });
-            Debug.Log($"[DialogueManager] GiveItem -> 发布 ItemAddedEvent: {itemId} x{count}");
-        }
-
-        private void RemoveItem(string itemId, int count)
-        {
-            if (string.IsNullOrEmpty(itemId)) return;
-
-            GameRuntimeData data = GameRoot.Instance?.Context?.Data;
-            if (data == null || data.Inventory == null) return;
-
-            ItemEntry entry = data.Inventory.items.Find(i => i != null && i.itemId == itemId);
-            if (entry == null)
-            {
-                Debug.LogWarning($"[DialogueManager] 背包中没有 {itemId}，无法扣除。");
-                return;
-            }
-
-            entry.count -= count;
-            if (entry.count <= 0)
-            {
-                data.Inventory.items.Remove(entry);
-            }
-
-            Debug.Log($"[DialogueManager] RemoveItem -> 扣除 {itemId} x{count}，剩余 {entry.count}");
+            DialogueInstructionExecutor.Execute(action, questId, itemId, itemCount);
         }
 
         public void ShowDialogue()
@@ -312,6 +330,9 @@ namespace MintLandDemo.UI.Dialogue
         {
             IsDialogueActive = false;
             _nodes = null;
+            _graph = null;
+            _currentGraphNode = null;
+            _pendingEdge = null;
             if (nextButton != null) nextButton.gameObject.SetActive(true);
             if (dialoguePanel != null) dialoguePanel.SetActive(false);
             if (ChoiceManager.Instance != null) ChoiceManager.Instance.HideChoices();

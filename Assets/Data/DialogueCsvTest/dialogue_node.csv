@@ -1,0 +1,8 @@
+node_id,speaker_name,dialogue_text,action,quest_id,item_id,item_count,editor_x,editor_y
+n_greet,珠宝商,你好，旅行者。,None,,,0,100,-100
+n_who,珠宝商,我是流浪的珠宝商。,None,,,0,300,-100
+n_offer,珠宝商,愿意听我讲个故事吗？,None,,,0,500,-100
+n_story1,珠宝商,很久以前，我在矿洞里挖到了红宝石。,None,,,0,700,-50
+n_story2,珠宝商,塌方时这颗宝石救了我一命。,None,,,0,900,-50
+n_gift,珠宝商,这个送给你，算是缘分。,GiveItem,,ruby,1,1100,-50
+n_bye,珠宝商,下次再会。,None,,,0,700,-250

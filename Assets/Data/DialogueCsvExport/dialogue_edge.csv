@@ -1,0 +1,7 @@
+﻿edge_id,from_node_id,to_node_id,choice_text,sort_order,action,quest_id,item_id,item_count
+e_greet_who,n_greet,n_who,,0,None,,,0
+e_who_offer,n_who,n_offer,,0,None,,,0
+e_offer_story,n_offer,n_story1,我愿意听,0,None,,,0
+e_offer_bye,n_offer,n_bye,下次再说,1,None,,,0
+e_story1_story2,n_story1,n_story2,,0,None,,,0
+e_story2_gift,n_story2,n_gift,,0,None,,,0
